@@ -131,7 +131,7 @@
   async function pdfTables(file) {
     await loadLibrary(CDN.pdf, 'pdfjsLib');
     pdfjsLib.GlobalWorkerOptions.workerSrc = CDN.pdfWorker;
-    const documentRef = await pdfjsLib.getDocument({data: new Uint8Array(await file.arrayBuffer())}).promise;
+    const documentRef = await pdfjsLib.getDocument({data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false}).promise;
     const tables = [];
     let scanned = true;
     try {
@@ -170,12 +170,10 @@
             }
             row[index] += (row[index] ? ' ' : '') + it.str;
           }
-          if (time.trim()) row.unshift(time.trim());
-          rows.push(row);
+          rows.push([time.trim(), ...row]);
         }
-        // Los encabezados de PDF no siempre incluyen la columna de horas.
-        const hasTimes = rows.slice(1).some(row => /^\d{1,2}[:.]\d{2}/.test(row[0]));
-        if (hasTimes) rows[0].unshift('Hora');
+        // Reservamos siempre la columna de horas, aunque alguna fila no la incluya.
+        rows[0].unshift('Hora');
         tables.push(rows);
       }
       if (scanned || tables.length === 0) {
