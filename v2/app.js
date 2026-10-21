@@ -83,8 +83,8 @@ if(setting==='datos'){body='<h3>Guardado y privacidad</h3><div class="notice inf
 return '<div class="settings-grid"><aside class="settings-menu">'+settingsMenu()+'</aside><section class="card">'+body+'</section></div>'}
 function importCard(){return '<section><h3>Importar un horario con foto o documento</h3><p class="muted small">PDF original de GestIB, fotografías o DOCX. Interpretamos columnas y horas; los cambios solo se aplican después de tu revisión.</p><div class="actions">'+button('Elegir archivo','choose-photo','secondary')+button('Abrir cámara','take-photo','secondary')+'</div><input id="schedule-upload" hidden type="file" accept="image/*,.pdf,.docx,application/pdf"><input id="schedule-camera" hidden type="file" accept="image/*" capture="environment"><p class="small muted" id="import-status">'+(pickedFile?'Seleccionado: '+esc(pickedFile.name):'No has seleccionado ningún archivo')+'</p>'+button('Analizar imagen o documento','analyze-file','sm',pickedFile?'':'disabled')+(importDraft?reviewImport():importInfo())+'</section>'}
 function reviewImport(){
-  return importInfo()+'<div class="notice info" style="margin:18px 0">Comprueba que los días, las asignaturas y todas las horas coinciden con tu horario original. Los espacios en blanco deben completarse; la aplicación no inventa horarios.</div><div class="preview-table"><table><thead><tr><th>Día</th><th>Desde / Hasta</th><th>Asignatura detectada</th><th>Profesor</th><th></th></tr></thead><tbody>'+
-  importDraft.map((sl,i)=>'<tr><td><select data-import-day="'+i+'">'+DAYS.map((d,di)=>'<option value="'+di+'" '+(di===sl.day?'selected':'')+'>'+d+'</option>').join('')+'</select></td><td><div class="cols2"><input aria-label="Hora de inicio" type="time" data-import-start="'+i+'" value="'+esc(sl.start||'')+'"><input aria-label="Hora de fin" type="time" data-import-end="'+i+'" value="'+esc(sl.end||'')+'"></div></td><td><input class="input" data-import-subject="'+i+'" value="'+esc(sl.subject||'')+'" placeholder="Nombre de asignatura"></td><td><input class="input" data-import-teacher="'+i+'" value="'+esc(sl.teacher||'')+'" placeholder="Opcional"></td><td><button type="button" class="icon-btn" data-act="remove-import-row" data-index="'+i+'" aria-label="Eliminar fila">×</button></td></tr>').join('')+'</tbody></table></div><div class="actions" style="margin-top:15px">'+button('＋ Añadir fila','add-import-row','secondary')+button('Guardar horario revisado','confirm-import')+button('Cancelar','cancel-import','secondary')+'</div>';
+  return importInfo()+'<div class="notice info" style="margin:18px 0">1. Comprueba que los días, las asignaturas y las franjas de clase coinciden con el documento. Los espacios en blanco deben completarse; la aplicación no inventa horarios.</div><div class="preview-table"><table><thead><tr><th>Día</th><th>Desde / Hasta</th><th>Asignatura detectada</th><th>Profesor</th><th></th></tr></thead><tbody>'+
+  importDraft.map((sl,i)=>'<tr><td><select data-import-day="'+i+'">'+DAYS.map((d,di)=>'<option value="'+di+'" '+(di===sl.day?'selected':'')+'>'+d+'</option>').join('')+'</select></td><td><div class="cols2"><input aria-label="Hora de inicio" type="time" data-import-start="'+i+'" value="'+esc(sl.start||'')+'"><input aria-label="Hora de fin" type="time" data-import-end="'+i+'" value="'+esc(sl.end||'')+'"></div></td><td><input class="input" data-import-subject="'+i+'" value="'+esc(sl.subject||'')+'" placeholder="Nombre de asignatura"></td><td><input class="input" data-import-teacher="'+i+'" value="'+esc(sl.teacher||'')+'" placeholder="Opcional"></td><td><button type="button" class="icon-btn" data-act="remove-import-row" data-index="'+i+'" aria-label="Eliminar fila">×</button></td></tr>').join('')+'</tbody></table></div>'+reviewHourModules()+'<div class="actions" style="margin-top:15px">'+button('＋ Añadir fila','add-import-row','secondary')+button('Unificar módulos y guardar horario','confirm-import')+button('Cancelar','cancel-import','secondary')+'</div>';
 }
 function render(){document.documentElement.dataset.theme=state.profile.theme==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):state.profile.theme;qs('#app').innerHTML=state.setup?shell():wizard()}
 function navigate(v){view=v;render();window.scrollTo({top:0,behavior:'smooth'})}
@@ -128,38 +128,77 @@ async function analyzeFile(){
     showImportStatus(importError);render();toast('Error al leer el horario. Consulta el detalle debajo del archivo.');
   }
 }
+
 function importReviewed(){
   if(!importDraft)return;
+  readImportEdits();
   const copy=[];
   for(let i=0;i<importDraft.length;i++){
-    const day=Number(qs('[data-import-day="'+i+'"]')?.value),start=qs('[data-import-start="'+i+'"]')?.value||'',
-      end=qs('[data-import-end="'+i+'"]')?.value||'',subject=qs('[data-import-subject="'+i+'"]')?.value.trim()||'',
-      teacher=qs('[data-import-teacher="'+i+'"]')?.value.trim()||'';
+    const row=importDraft[i];
+    const {day,start,end}=row,subject=String(row.subject||'').trim(),teacher=String(row.teacher||'').trim();
     if(!subject)continue;
-    if(!Number.isInteger(day)||day<0||day>6){toast('Revisa el día de la semana de cada clase.');return;}
+    if(!Number.isInteger(day)||day<0||day>6){toast('Revisa el día de la semana de la fila '+(i+1));return}
     if(!validTime(start)||!validTime(end)||minutes(end)<=minutes(start)){
-      toast('Faltan horas correctas en la fila '+(i+1)+'. Debes confirmarlas manualmente.');return;
+      toast('Revisa las horas de la fila '+(i+1));return;
     }
     copy.push({day,start,end,subject,teacher});
   }
-  if(!copy.length){toast('Confirma al menos una asignatura.');return}
+  if(!copy.length){toast('Confirma al menos una asignatura');return}
   for(let day=0;day<7;day++){
-    const rows=copy.filter(s=>s.day===day).sort((a,b)=>a.start.localeCompare(b.start));
+    const rows=copy.filter(x=>x.day===day).sort((a,b)=>a.start.localeCompare(b.start));
     for(let i=1;i<rows.length;i++)if(minutes(rows[i].start)<minutes(rows[i-1].end)){
-      toast('Hay clases superpuestas el '+DAYS[day]+'. Revisa las horas antes de guardar.');return;
+      toast('Hay clases superpuestas el '+DAYS[day]+'. Corrígelas antes de continuar.');return;
     }
   }
-  if(state.attendance.length&&!confirm('Ya tienes faltas registradas. Se conservarán, pero cambiar el horario puede afectar a las clases asociadas. Exporta primero una copia de seguridad. ¿Continuar?'))return;
-  const old=state.schedule,sched=[[],[],[],[],[],[],[]];
-  for(const s of copy){
-    let m=state.modules.find(x=>x.name.toLowerCase()===s.subject.toLowerCase());
-    if(!m)m=addModule(s.subject,0);if(m.archived)m.archived=false;
-    // Keep existing lesson IDs for unchanged slots so attendance survives imports.
-    const slot=old[s.day]?.find(sl=>sl.start===s.start&&sl.end===s.end&&sl.moduleId===m.id);
-    sched[s.day].push({id:slot?.id||uid(),start:s.start,end:s.end,moduleId:m.id,teacher:s.teacher});
+  const needed=[...new Set(copy.map(x=>CFModules.canonical(x.subject)))].filter(Boolean);
+  const drawn=qa('[data-hour-key]').map(x=>x.dataset.hourKey);
+  // If the user edited the subject labels since the last render, recheck all
+  // module matches and hour suggestions before committing any changes.
+  if(needed.some(k=>!drawn.includes(k))){render();toast('Has cambiado las asignaturas. Comprueba sus horas debajo de la tabla y vuelve a guardar.');return}
+  const hours={};
+  for(const row of copy){
+    const k=CFModules.canonical(row.subject);
+    if(Object.prototype.hasOwnProperty.call(hours,k))continue;
+    if(CFModules.isTutoria(row.subject)){hours[k]=0;continue}
+    const suggestion=CFModules.suggestedHours(row.subject,state.profile,state.modules);
+    const raw=Object.prototype.hasOwnProperty.call(importHourEdits,k)?importHourEdits[k]:suggestion.hours;
+    const n=raw===''?0:Number(raw);
+    if(!Number.isFinite(n)||n<0||n>9999||!Number.isInteger(n)){toast('Revisa las horas de '+row.subject);return}
+    hours[k]=n;
   }
-  state.schedule=sched.map(day=>day.sort((a,b)=>a.start.localeCompare(b.start)));
-  clearImport();pickedFile=null;save();render();toast('Horario guardado tras revisión.');
+  const unresolved=needed.filter(k=>!(hours[k]>0)&&k!=='tutoria');
+  if(unresolved.length&&!confirm('Faltan las horas lectivas de '+unresolved.length+' módulos ('+unresolved.map(k=>copy.find(x=>CFModules.canonical(x.subject)===k)?.subject).join(', ')+'). No tendrán porcentaje hasta que indiques sus horas. ¿Guardar igualmente?'))return;
+  const previouslyActive=activeModules().length;
+  const warned=state.attendance.length>0||state.events.length>0||previouslyActive>0;
+  if(warned&&!confirm('Se reemplazará el horario actual y se unificarán asignaturas equivalentes. Los módulos antiguos que no aparezcan se archivarán. Las faltas y actividades seguirán guardadas. Recomendamos exportar una copia antes. ¿Continuar?'))return;
+  const totals=CFModules.officialTotals(state.profile);
+  if(totals&&totals.year&&!state.profile.yearHours)state.profile.yearHours=totals.year;
+  const result=CFModules.reconcile(state,copy,{hours,archiveUnused:true,uid});
+  state=normalize(result.state);
+  clearImport();pickedFile=null;save();render();
+  toast('Horario guardado: '+result.report.periods+' clases, '+result.report.active+' módulos; '+result.report.merged+' duplicados unificados.');
+}
+function reviewHourModules(){
+  if(!importDraft)return '';
+  const unique=new Map();
+  for(const sl of importDraft){const key=CFModules.canonical(sl.subject);if(key&&!unique.has(key))unique.set(key,sl.subject);}
+  const total=CFModules.officialTotals(state.profile);
+  const list=[...unique].map(([key,name])=>{
+    const tut=CFModules.isTutoria(name);
+    const suggestion=CFModules.suggestedHours(name,state.profile,state.modules);
+    const manual=Object.prototype.hasOwnProperty.call(importHourEdits,key)?importHourEdits[key]:null;
+    const amount=manual===null?(suggestion.hours||''):manual;
+    const label=tut?'No computa como módulo profesional':suggestion.source;
+    return '<div class="hour-row"><div class="hour-name"><strong>'+esc(CFModules.niceName(name))+'</strong><small>'+esc(label)+'</small></div>'+
+      (tut?'<span class="pill">Tutoría</span>':'<label class="hour-control"><span>Horas del módulo</span><input type="number" class="input" data-hour-key="'+esc(key)+'" min="0" max="9999" step="1" value="'+esc(amount)+'" placeholder="Indicar horas"></label>')+'</div>';
+  }).join('');
+  return '<div class="rule"></div><h3 style="margin-bottom:8px">2. Comprueba los módulos y sus horas</h3>'+
+    '<p class="small muted">Unificaremos las materias equivalentes aunque en GestIB aparezcan en catalán o con -A/-B. Si ya tenías horas configuradas, las conservaremos. Solo utiliza los valores oficiales cuando corresponde al currículo elegido.</p>'+
+    '<div class="field"><label>COMUNIDAD AUTÓNOMA DEL CURRÍCULO</label><select id="import-region" class="input">'+regionOptions()+'</select></div>'+
+    (total?'<div class="notice info">Ciclo completo: <b>'+total.cycle+' h</b> · Curso actual: <b>'+(total.year||'por determinar')+' h</b>. Estas cifras no son las horas de cada asignatura. <a href="'+esc(total.url)+'" target="_blank" rel="noopener noreferrer">Fuente oficial</a>.</div>':
+    '<div class="notice info">No se ha seleccionado un currículo autonómico con horas verificadas. Puedes introducir las horas de cada módulo o dejarlas pendientes. No dividiremos las horas del ciclo entre las asignaturas.</div>')+
+    '<div class="hour-list">'+list+'</div>'+
+    '<p class="small muted">Si «Introducción a la programación» es tu módulo optativo en SMR Baleares, consulta si le corresponden las 80 horas del optativo y escríbelas. No lo asumimos sin confirmación.</p>';
 }
 function backup(){let blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='controlfaltas_respaldo_'+today()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),500);toast('Guarda este archivo en un lugar seguro')}
 function restoreBackup(file){file.text().then(t=>{let d=JSON.parse(t);if(d.v!==2||!Array.isArray(d.schedule)||!Array.isArray(d.modules))throw Error('Formato de copia desconocido');if(confirm('¿Sustituir tus datos actuales por esta copia?')){state=normalize(d);save();navigate('inicio');toast('Copia restaurada')}}).catch(e=>toast('No se pudo importar: '+e.message))}
@@ -184,6 +223,16 @@ case 'cancel-import':clearImport();render();break;
 case 'add-import-row':readImportEdits();importDraft.push({day:0,start:'',end:'',subject:'',teacher:''});render();break;
 case 'remove-import-row':readImportEdits();importDraft.splice(Number(el.dataset.index),1);render();break;
 case 'confirm-import':importReviewed();break;
+case 'sync-modules':{
+  if(!state.schedule.some(day=>day.length)){toast('Primero importa o configura tu horario.');return}
+  if(!confirm('Se unificarán las asignaturas equivalentes y se archivarán los módulos sin clases. Se conservarán faltas, exámenes y las horas existentes. ¿Continuar?'))return;
+  syncEditor();
+  const lessons=CFModules.lessonsFromSchedule(state);
+  const result=CFModules.reconcile(state,lessons,{archiveUnused:true,uid});
+  state=normalize(result.state);save();render();
+  toast('Módulos activos: '+result.report.active+'. Duplicados unidos: '+result.report.merged+'.');
+  break;
+}
 case 'go-cal':navigate('calendario');break;
 case 'go-att':navigate('faltas');break;
 case 'open-schedule-settings':chooseSettings('horario');break;
@@ -210,10 +259,16 @@ if(el.id==='fp-grade'){gradeFilter=el.value;searchText=qs('#fp-search')?.value||
 if(el.id==='schedule-day'){if(!collectSchedule()){el.value=editingDay;return}editingDay=Number(el.value);save();render();return}
 if(el.id==='attendance-date'){selected=el.value;render();return}
 if(el.classList.contains('status-select')){toggleAttendance(el.dataset.lesson,el.value);return}
+if(el.id==='import-region'){
+  readImportEdits();state.profile.region=el.value;
+  const totals=CFModules.officialTotals(state.profile);
+  if(totals&&totals.year)state.profile.yearHours=totals.year;
+  save();render();return;
+}
 if(el.id==='schedule-upload'||el.id==='schedule-camera'){pickedFile=el.files[0]||null;clearImport();showImportStatus(pickedFile?'Archivo: '+pickedFile.name:'No seleccionado');const btn=qs('[data-act="analyze-file"]');if(btn)btn.disabled=!pickedFile;return}
 if(el.id==='backup-input'){if(el.files[0])restoreBackup(el.files[0]);el.value='';return}
 });
-document.addEventListener('input',e=>{if(e.target.id==='fp-search'){searchText=e.target.value;let list=qs('.lookup-list');if(!list)return;let filtered=FP_CATALOG.filter(c=>(!gradeFilter||c.grade===gradeFilter)&&(!searchText||(c.name+' '+c.family).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(searchText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')))).slice(0,65);list.innerHTML=filtered.map(c=>'<button class="lookup-item" data-act="pick-fp" data-fpid="'+c.id+'"><strong>'+esc(c.name)+'</strong><small>'+esc(c.grade)+' · '+esc(c.family)+'</small></button>').join('')||empty('No se encontró ese título.') }});
+document.addEventListener('input',e=>{if(e.target?.dataset?.hourKey){importHourEdits[e.target.dataset.hourKey]=e.target.value;return}if(e.target.id==='fp-search'){searchText=e.target.value;let list=qs('.lookup-list');if(!list)return;let filtered=FP_CATALOG.filter(c=>(!gradeFilter||c.grade===gradeFilter)&&(!searchText||(c.name+' '+c.family).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(searchText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')))).slice(0,65);list.innerHTML=filtered.map(c=>'<button class="lookup-item" data-act="pick-fp" data-fpid="'+c.id+'"><strong>'+esc(c.name)+'</strong><small>'+esc(c.grade)+' · '+esc(c.family)+'</small></button>').join('')||empty('No se encontró ese título.') }});
 load();
 if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 })();
