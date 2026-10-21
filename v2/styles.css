@@ -34,3 +34,14 @@ html[data-theme=dark]{--bg:#101321;--paper:#1a2033;--soft:#242a40;--ink:#eef0ff;
 /* Consistent theme-selector icon treatment */
 .choice{display:flex;align-items:center;justify-content:center;gap:9px}
 .choice>.ui-icon{width:19px;height:19px}
+
+/* Materias identificadas al importar GestIB: carga lectiva por módulo. */
+.hour-list{display:flex;flex-direction:column;gap:9px;margin:15px 0 20px}
+.hour-row{display:flex;align-items:center;justify-content:space-between;gap:16px;background:var(--soft);border:1px solid var(--border);border-radius:14px;padding:12px 14px}
+.hour-name{min-width:0;flex:1;display:flex;flex-direction:column;gap:5px}
+.hour-name strong{font-size:13px;font-weight:800;overflow-wrap:anywhere}
+.hour-name small{font-size:11px;color:var(--sub);line-height:1.5}
+.hour-control{width:132px;flex:none;display:flex;flex-direction:column;gap:5px}
+.hour-control>span{font-size:10px;font-weight:800;color:var(--sub)}
+.hour-control input{width:100%;background:var(--paper);font-weight:800;text-align:right}
+@media(max-width:600px){.hour-row{align-items:stretch;flex-wrap:wrap}.hour-control{width:100%;max-width:none}.hour-control input{text-align:left}}
