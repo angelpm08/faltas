@@ -1,4 +1,4 @@
-const CACHE='cfv2-offline-v4',ASSETS=['./','./index.html','./styles.css','./app.js','./catalog.js','./schedule-import.js','./schedule-file-reader.js','./manifest.webmanifest','../icons/icon-192.png','../icons/icon-512.png'];
+const CACHE='cfv2-offline-v5',ASSETS=['./','./index.html','./styles.css','./app.js','./catalog.js','./schedule-import.js','./schedule-file-reader.js','./manifest.webmanifest','./brand/cf-mark.svg','../icons/icon-192.png','../icons/icon-512.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('cfv2-offline-')&&k!==CACHE).map(k=>caches.delete(k))))])));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const u=new URL(e.request.url);if(u.origin!==self.location.origin)return;const inApp=u.pathname.includes('/faltas/v2/');if(!inApp)return;
