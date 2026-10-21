@@ -30,3 +30,7 @@ html[data-theme=dark]{--bg:#101321;--paper:#1a2033;--soft:#242a40;--ink:#eef0ff;
 .brand-mark.wizard-brand{width:76px;height:76px}
 .settings-menu button{min-height:49px;padding:12px}
 }
+
+/* Consistent theme-selector icon treatment */
+.choice{display:flex;align-items:center;justify-content:center;gap:9px}
+.choice>.ui-icon{width:19px;height:19px}
