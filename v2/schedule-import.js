@@ -120,7 +120,13 @@
         const lo=a.y+Math.max(2,medianH*.4);
         const hi=next?next.y-Math.max(2,medianH*.36):a.y+spacing*.94;
         const subjectWords=words.filter(w=>w.y>lo&&w.y<hi);
-        const subject=parseSubject(subjectWords);
+        let subject=parseSubject(subjectWords);
+        // Word/HTML exports sometimes put both the time and class name in
+        // the same cell/line. Recover the label after the inline time range.
+        if(!subject){
+          const inline=clean(a.text.replace(/(?:[01]?\d|2[0-3])\s*[:.h]\s*[0-5]\d\s*(?:-|–|—|a|to)\s*(?:[01]?\d|2[0-3])\s*[:.h]\s*[0-5]\d/i,'').replace(/^[-–—\s]+/,''));
+          if(inline&&times(inline).length===0)subject=parseSubject([box({text:inline,x0:col.left+1,x1:col.right-1,y0:a.y+2,y1:a.y+medianH})]);
+        }
         if(subject){
           directRows.push({day:col.day,start:a.start,end:a.end,subject:subject.subject,teacher:subject.teacher});
         }else{
