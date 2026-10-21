@@ -114,8 +114,39 @@ async function analyzeFile(){
     showImportStatus(importError);render();toast('Error al leer el horario. Consulta el detalle debajo del archivo.');
   }
 }
-function importReviewed(){if(!importDraft)return;let copy=[];for(let i=0;i<importDraft.length;i++){let day=Number(qs('[data-import-day="'+i+'"]')?.value),start=qs('[data-import-start="'+i+'"]')?.value,end=qs('[data-import-end="'+i+'"]')?.value,subject=qs('[data-import-subject="'+i+'"]')?.value.trim(),teacher=qs('[data-import-teacher="'+i+'"]')?.value.trim();if(!subject)continue;if(!validTime(start)||!validTime(end)||minutes(end)<=minutes(start)){toast('Revisa las horas de cada fila');return;}copy.push({day,start,end,subject,teacher})}if(!copy.length){toast('Debes confirmar al menos una asignatura');return}if(state.attendance.length&&!confirm('Ya tienes faltas registradas. Cambiar el horario puede afectar la asociación con las clases antiguas. Exporta primero una copia. ¿Continuar?'))return;
-let sched=[[],[],[],[],[],[],[]];for(let s of copy){let m=state.modules.find(x=>x.name.toLowerCase()===s.subject.toLowerCase());if(!m)m=addModule(s.subject,0);if(m.archived)m.archived=false;sched[s.day].push({id:uid(),start:s.start,end:s.end,moduleId:m.id,teacher:s.teacher})}state.schedule=sched.map(day=>day.sort((a,b)=>a.start.localeCompare(b.start)));clearImport();pickedFile=null;save();render();toast('Horario importado. Verifica los módulos y las horas.')}
+function importReviewed(){
+  if(!importDraft)return;
+  const copy=[];
+  for(let i=0;i<importDraft.length;i++){
+    const day=Number(qs('[data-import-day="'+i+'"]')?.value),start=qs('[data-import-start="'+i+'"]')?.value||'',
+      end=qs('[data-import-end="'+i+'"]')?.value||'',subject=qs('[data-import-subject="'+i+'"]')?.value.trim()||'',
+      teacher=qs('[data-import-teacher="'+i+'"]')?.value.trim()||'';
+    if(!subject)continue;
+    if(!Number.isInteger(day)||day<0||day>6){toast('Revisa el día de la semana de cada clase.');return;}
+    if(!validTime(start)||!validTime(end)||minutes(end)<=minutes(start)){
+      toast('Faltan horas correctas en la fila '+(i+1)+'. Debes confirmarlas manualmente.');return;
+    }
+    copy.push({day,start,end,subject,teacher});
+  }
+  if(!copy.length){toast('Confirma al menos una asignatura.');return}
+  for(let day=0;day<7;day++){
+    const rows=copy.filter(s=>s.day===day).sort((a,b)=>a.start.localeCompare(b.start));
+    for(let i=1;i<rows.length;i++)if(minutes(rows[i].start)<minutes(rows[i-1].end)){
+      toast('Hay clases superpuestas el '+DAYS[day]+'. Revisa las horas antes de guardar.');return;
+    }
+  }
+  if(state.attendance.length&&!confirm('Ya tienes faltas registradas. Se conservarán, pero cambiar el horario puede afectar a las clases asociadas. Exporta primero una copia de seguridad. ¿Continuar?'))return;
+  const old=state.schedule,sched=[[],[],[],[],[],[],[]];
+  for(const s of copy){
+    let m=state.modules.find(x=>x.name.toLowerCase()===s.subject.toLowerCase());
+    if(!m)m=addModule(s.subject,0);if(m.archived)m.archived=false;
+    // Keep existing lesson IDs for unchanged slots so attendance survives imports.
+    const slot=old[s.day]?.find(sl=>sl.start===s.start&&sl.end===s.end&&sl.moduleId===m.id);
+    sched[s.day].push({id:slot?.id||uid(),start:s.start,end:s.end,moduleId:m.id,teacher:s.teacher});
+  }
+  state.schedule=sched.map(day=>day.sort((a,b)=>a.start.localeCompare(b.start)));
+  clearImport();pickedFile=null;save();render();toast('Horario guardado tras revisión.');
+}
 function backup(){let blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='controlfaltas_respaldo_'+today()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),500);toast('Guarda este archivo en un lugar seguro')}
 function restoreBackup(file){file.text().then(t=>{let d=JSON.parse(t);if(d.v!==2||!Array.isArray(d.schedule)||!Array.isArray(d.modules))throw Error('Formato de copia desconocido');if(confirm('¿Sustituir tus datos actuales por esta copia?')){state=normalize(d);save();navigate('inicio');toast('Copia restaurada')}}).catch(e=>toast('No se pudo importar: '+e.message))}
 document.addEventListener('click',e=>{let nav=e.target.closest('[data-nav]');if(nav){navigate(nav.dataset.nav);return}let el=e.target.closest('[data-act]');if(!el)return;let act=el.dataset.act;
