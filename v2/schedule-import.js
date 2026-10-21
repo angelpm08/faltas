@@ -230,7 +230,7 @@
     }
     // Duplicate PDF glyph fragments or two OCR words on top of each other
     // should never create repeated timetable sessions.
-    rows=rows.filter((r,i)=>rows.findIndex(x=>x.day===r.day&&x.start===r.start&&x.end===r.end&&norm(x.subject)===norm(r.subject))===i);
+    rows=rows.filter((r,i)=>!r.start||!r.end||rows.findIndex(x=>x.day===r.day&&x.start===r.start&&x.end===r.end&&norm(x.subject)===norm(r.subject))===i);
     rows.sort((a,b)=>a.day-b.day||(a.start||'99').localeCompare(b.start||'99'));
     const bad=rows.filter(r=>!r.start||!r.end||minute(r.end)<=minute(r.start));
     if(bad.length)warnings.push('Faltan horas válidas en '+bad.length+' clase(s). Es obligatorio completarlas al revisar.');
