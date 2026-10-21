@@ -114,6 +114,8 @@
       if(group.length<2)continue;
       group.sort((a,b)=>priorities(b)-priorities(a));
       const main=group[0];for(const other of group.slice(1)){
+        const stillReferenced=next.attendance.some(a=>a.moduleId===other.id)||next.events.some(e=>e.moduleId===other.id)||oldSchedule.some(week=>week.some(sl=>sl.moduleId===other.id));
+        if(other.archived&&!stillReferenced)continue;
         if(!main.teacher&&other.teacher)main.teacher=other.teacher;
         if(!(main.hours>0)&&other.hours>0)main.hours=other.hours;
         merged[other.id]=main.id;other.archived=true;
