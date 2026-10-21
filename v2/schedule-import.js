@@ -92,7 +92,53 @@
     }
     return lines.sort((a,b)=>a.y-b.y).map(l=>({...l,words:l.words.sort((a,b)=>a.x0-b.x0),text:l.words.map(w=>w.text).join(' ')}));
   }
+  // GestIB and most modern school PDFs use a time/subject pair INSIDE
+  // EACH weekday column, often with different starting hours per day.
+  function parseColumnTimetables(boxes,header){
+    const {cells,headerY,medianH,gap}=header;
+    let directRows=[],warnings=[],columnsWithTimes=0,ambiguous=0;
+    for(const col of cells){
+      const words=boxes.filter(w=>w.x>=col.left&&w.x<col.right&&w.y>headerY+medianH*.65);
+      const lines=sortRead(words);
+      let anchors=[];
+      for(const line of lines){
+        const t=times(line.text);
+        if(t.length<2)continue;
+        const duration=minute(t[1])-minute(t[0]);
+        if(duration<=0||duration>240)continue;
+        anchors.push({y:line.y,start:t[0],end:t[1],text:line.text});
+      }
+      if(anchors.length<2)continue;
+      anchors.sort((a,b)=>a.y-b.y);
+      anchors=anchors.filter((a,i)=>!i||a.y-anchors[i-1].y>Math.max(4,medianH*.48));
+      if(anchors.length<2)continue;
+      columnsWithTimes++;
+      const separations=anchors.slice(1).map((a,i)=>a.y-anchors[i].y).filter(x=>x>medianH);
+      const spacing=median(separations)||Math.max(25,medianH*4);
+      for(let i=0;i<anchors.length;i++){
+        const a=anchors[i],next=anchors[i+1];
+        const lo=a.y+Math.max(2,medianH*.4);
+        const hi=next?next.y-Math.max(2,medianH*.36):a.y+spacing*.94;
+        const subjectWords=words.filter(w=>w.y>lo&&w.y<hi);
+        const subject=parseSubject(subjectWords);
+        if(subject){
+          directRows.push({day:col.day,start:a.start,end:a.end,subject:subject.subject,teacher:subject.teacher});
+        }else{
+          ambiguous++;
+          warnings.push('Falta asignatura en '+(['lunes','martes','miércoles','jueves','viernes','sábado','domingo'][col.day])+' '+a.start+'–'+a.end+'.');
+        }
+      }
+    }
+    if(columnsWithTimes>=Math.max(3,cells.length*.6)&&directRows.length>=6){
+      if(columnsWithTimes<cells.length)warnings.push('Algunos días no tienen suficientes horas legibles; revisa que no falten clases.');
+      if(ambiguous)warnings.push('Hay '+ambiguous+' franjas sin asignatura reconocible.');
+      return {directRows,warnings,columnsWithTimes};
+    }
+    return null;
+  }
   function getRows(boxes,header){
+    const direct=parseColumnTimetables(boxes,header);
+    if(direct)return {anchors:[],directRows:direct.directRows,warnings:direct.warnings};
     const {cells,headerY,medianH,gap}=header;
     const leftBound=Math.min(...cells.map(c=>c.left));
     const onlyBelow=boxes.filter(w=>w.y>headerY+medianH*.75);
@@ -144,7 +190,9 @@
   }
   function extract(boxes,header,rowspec) {
     const {cells,headerY,medianH}=header;let rows=[],warnings=[...rowspec.warnings];
-    if(rowspec.anchors.length){
+    if(rowspec.directRows){
+      rows=rowspec.directRows.slice();
+    }else if(rowspec.anchors.length){
       for(const anchor of rowspec.anchors){
         for(const col of cells){
           const words=cellContent(boxes,col,anchor.top,anchor.bottom,headerY);
