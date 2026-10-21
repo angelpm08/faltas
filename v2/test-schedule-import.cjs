@@ -32,7 +32,7 @@ assert.equal(res.rows.find(x=>x.day===3&&x.start==='17:00').end,'17:55');
 assert.equal(res.rows.find(x=>x.day===4&&x.start==='17:50').end,'18:45');
 assert.equal(dayOf('DIMECRES'),2);assert.deepEqual(times('15:05-16:00'),['15:05','16:00']);
 assert.equal(chooseBest([{tokens:actual,page:1,method:'PDF'}]).stats.classes,31);
-const word=names.flatMap((n,d)=>[item(n,d*170,0,75,12),...Array.from({length:3},(_,i)=>item('08:00-08:55 Matemàtiques',d*170,70+i*70,147,16))]);
+const word=names.flatMap((n,d)=>[item(n,d*170,0,75,12),...Array.from({length:3},(_,i)=>item(`${String(8+i).padStart(2,'0')}:00-${String(8+i).padStart(2,'0')}:55 Matemàtiques`,d*170,70+i*70,147,16))]);
 assert.equal(parseTokens(word).rows.length,15,'Word inline cells');
 const noHours=names.flatMap((n,d)=>[item(n,d*170,0,75,12),...Array.from({length:2},(_,i)=>item('Matemàtiques',d*170,70+i*70,110,16))]);
 const partial=parseTokens(noHours);assert.equal(partial.stats.classes,10);assert.equal(partial.stats.completeTimes,0,'Do not invent class hours');
