@@ -102,7 +102,7 @@
     const priorities=m=>{
       const referenced=next.attendance.filter(x=>x.moduleId===m.id).length+next.events.filter(x=>x.moduleId===m.id).length;
       const scheduled=oldSchedule.flat().filter(x=>x.moduleId===m.id).length;
-      return referenced*1000+(Number(m.hours)>0?100:0)+scheduled*3+(!m.archived?4:0);
+      return (Number(m.hours)>0?100000:0)+referenced*100+scheduled*3+(!m.archived?4:0);
     };
     for(const m of next.modules){
       const key=canonical(m.name);if(!key)continue;
