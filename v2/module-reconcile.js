@@ -62,7 +62,7 @@
     'sistemas operativos monopuesto':155,'sistemes operatius monolloc':155,
     'aplicaciones ofimaticas':210,'aplicacions ofimatiques':210,
     'redes locales':190,'xarxes locals':190,'ingles profesional':120,'angles professional':120,
-    'digitalizacion aplicada':30,'digitalitzacio aplicada':30,
+    'digitalizacion aplicada':30,'digitalizacion aplicada a los sectores productivos':30,'digitalitzacio aplicada':30,'digitalitzacio aplicada als sectors productius':30,
     'itinerario personal i':90
   };
   const SOURCE='Currículo LOIFP del Govern de les Illes Balears (IFC21).';
